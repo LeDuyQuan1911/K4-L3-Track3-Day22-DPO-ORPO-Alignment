@@ -1,7 +1,8 @@
 # Bài phản tư — Lab 22 (DPO/ORPO Alignment)
 
-**Tên:** _Chờ người học xác nhận_
+**Tên:** _Người học tự điền_
 **Khoá:** AICB-P2T3 · K4
+**Lớp/nhóm:** _Người học tự điền_
 **Tier:** Google Colab T4
 **Ngày:** 2026-10-09
 

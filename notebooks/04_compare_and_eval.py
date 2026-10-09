@@ -162,10 +162,9 @@ plt.show()
 # Hội đồng mặc định: `Skywork-Reward-V2-Qwen3-4B` (cùng họ Qwen với Sailor2 và với mô hình đang học (policy)) và
 # `Skywork-Reward-V2-Llama-3.2-3B` (nền Llama, không chung mô hình nền với mô hình sinh dữ liệu hay RM gán
 # nhãn). Cả hai là Skywork V2, huấn luyện trên SynPref-40M chứ không phải dữ liệu của RM gán nhãn, nhưng
-# vẫn **cùng lab** với RM gán nhãn: đây là hạn chế còn lại. Chưa có RM nhỏ ngoài Skywork đọc tốt
-# tiếng Việt (InternLM2-1.8B-reward không nạp được với transformers 5). Đo trên 100 cặp tiếng Việt của
-# sailor2 (T4): cả hai xếp đúng 12/12 cặp kiểm tra nhanh; đồng ý với nhãn sailor2 88% (Qwen3) và 84% (Llama);
-# đồng ý với nhau 82%. `per_judge` và `judge_agreement` cho thấy hai giám khảo lệch nhau trên đầu ra của bạn.
+# vẫn **cùng lab** với RM gán nhãn: đây là hạn chế còn lại. Kiểm tra sanity tiếng Việt phải
+# được tính lại cho lần chạy hiện tại; không coi điểm từ lần thử trước là điểm của bạn.
+# `per_judge` và `judge_agreement` cho thấy hai giám khảo lệch nhau trên đầu ra của bạn.
 #
 # RM nào trượt bộ kiểm tra nhanh tiếng Việt (< 80%) bị loại khỏi hội đồng, trừ khi tất cả đều trượt.
 #
@@ -249,8 +248,9 @@ print(json.dumps(summary, ensure_ascii=False, indent=2))
 #
 # - Khoảng tin cậy chứa 0.5 ⇒ chưa đủ bằng chứng DPO tốt hơn SFT.
 # - `sanity_accuracy` < 0.8 ⇒ RM không đọc tốt tiếng Việt, đừng tin tỉ lệ thắng.
-# - `per_judge`: tỉ lệ thắng của từng RM trên held-out. Giám khảo Qwen3 cho DPO thắng cao hơn hẳn giám khảo Llama ⇒ dấu hiệu
-#   rò rỉ sở thích (preference leakage); tin tỉ lệ thắng của hội đồng (bảo thủ) hơn. `judge_agreement` thấp ⇒ RM bất đồng nhiều.
+# - `per_judge`: tỉ lệ thắng của từng RM trên held-out. Nếu giám khảo cùng họ với mô hình dữ liệu cho DPO thắng
+#   cao hơn hẳn giám khảo khác họ, đó có thể là dấu hiệu rò rỉ sở thích (preference leakage).
+#   Xem `judge_agreement` để biết hai RM bất đồng đến mức nào; chỉ tin RM đã qua kiểm tra sanity.
 # - `longer_answer_won_frac` gần 1 và DPO dài hơn SFT ⇒ có thể DPO chỉ học viết dài (so với NB2 §2).
 #   Xem thêm `length_matched_win_rate` (chỉ các cặp dài gần bằng nhau) và `score_length_spearman`
 #   (điểm RM tương quan với độ dài; gần 1 là RM đang chấm độ dài).
