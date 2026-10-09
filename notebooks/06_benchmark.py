@@ -62,6 +62,23 @@ def run_lm_eval(label: str, task: str, shots: int, limit: int | None) -> dict:
     if label == "dpo":
         model_args += f",peft={C.DPO_ADAPTER}"
     out_dir = C.EVAL_DIR / "lm_eval" / f"{label}-{task}"
+    # A cache entry is valid only for the same evaluation settings and exact
+    # checkpoint files. This lets Colab resume without mixing different runs.
+    weights = list(C.SFT_MERGED.glob("*.safetensors"))
+    if label == "dpo":
+        weights += list(C.DPO_ADAPTER.glob("*.safetensors"))
+    signature = {
+        "model_args": model_args, "task": task, "shots": shots, "limit": limit,
+        "batch": BATCH, "seed": C.SEED,
+        "weights": [[str(p), p.stat().st_size, p.stat().st_mtime_ns] for p in sorted(weights)],
+    }
+    cache = out_dir / "lab22-cache.json"
+    if cache.exists():
+        saved = json.loads(cache.read_text())
+        result_file = Path(saved.get("result_file", ""))
+        if saved.get("signature") == signature and result_file.is_file():
+            print(f"Reusing completed {label}/{task}: {result_file}")
+            return json.loads(result_file.read_text())
     cmd = [
         "lm_eval", "--model", "hf", "--model_args", model_args,
         "--tasks", task, "--num_fewshot", str(shots),
@@ -78,6 +95,7 @@ def run_lm_eval(label: str, task: str, shots: int, limit: int | None) -> dict:
     if proc.returncode != 0 or not files:
         print(proc.stderr[-2000:])
         raise RuntimeError(f"lm_eval failed for {label}/{task}")
+    cache.write_text(json.dumps({"signature": signature, "result_file": str(files[-1])}, indent=2))
     return json.loads(files[-1].read_text())
 
 
@@ -98,6 +116,10 @@ for name, (task, shots, limit, metric) in BENCHMARKS.items():
     for label in ("sft", "dpo"):
         value, err = score(run_lm_eval(label, task, shots, limit), task, metric)
         row[label], row[f"{label}_stderr"] = value, err
+        (C.EVAL_DIR / "benchmark_progress.json").write_text(
+            json.dumps({"compute_tier": C.COMPUTE_TIER, "dtype": DTYPE,
+                        "chat_template": True, "completed": rows + [row]}, indent=2)
+        )
     row["delta"] = row["dpo"] - row["sft"]
     rows.append(row)
     print(row)
