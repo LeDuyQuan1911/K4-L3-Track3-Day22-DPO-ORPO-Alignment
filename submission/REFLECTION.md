@@ -3,7 +3,7 @@
 **Tên:** Lê Duy Quân
 **MSSV:** 2A202602731
 **Khoá:** AICB-P2T3 · K4
-**Lớp/nhóm:** _Người học tự điền_
+**Lớp/nhóm:** Track 3 · lớp 3B
 **Tier:** Google Colab T4
 **Ngày:** 2026-10-09
 
