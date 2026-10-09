@@ -80,6 +80,8 @@ Tôi bắt đầu NB6 sau khi NB0–NB4 hoàn tất, dùng `lm-eval` với chat 
 
 Chênh lệch bằng 0, nên IFEval không cho thấy DPO cải thiện khả năng tuân thủ chỉ dẫn trong lần chạy này. Colab ngắt phiên GPU sau IFEval và khi nối lại báo hết hạn mức GPU; runtime CPU mới không còn trọng số hay file `lm-eval` của phiên cũ. GSM8K đã bắt đầu nhưng **chưa tạo điểm**; Global-MMLU-vi chưa chạy. Tôi không điền số cho hai bộ đó và không coi NB6 là hoàn tất.
 
+Ngày 09/10/2026, tôi chạy lại NB1–NB3 trên một phiên Colab T4 khác; số DPO đọc trực tiếp từ output lưu adapter nằm riêng ở `data/eval/dpo_new_account_metrics.json` để không trộn hai lần chạy. Tôi bắt đầu lại NB6 trên chính phiên này, nhưng runtime mất kết nối trong lượt IFEval SFT trước khi ghi kết quả. Vì vậy bảng trên **chỉ** là kết quả IFEval đã hoàn tất của phiên trước; lần chạy mới không đóng góp thêm điểm benchmark. Cell Mount Drive đã được xếp hàng nhưng chưa chạy, nên không thể coi các adapter của phiên mới là đã sao lưu.
+
 ## 8. Biến thể loss (bonus NB3b)
 
 Chưa chạy; không có số đo để báo cáo.
