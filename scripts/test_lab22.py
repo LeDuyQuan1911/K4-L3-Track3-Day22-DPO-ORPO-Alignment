@@ -301,6 +301,7 @@ from lab22 import modeling as MD
     "chosen,rejected,label",
     [
         ([0.0, 0.2, 0.4], [0.0, -0.2, -0.4], "INTENDED"),
+        ([0.0, 0.2, 0.4], [0.0, 0.1, 0.3], "AMBIGUOUS"),
         ([0.0, -0.2, -0.4], [0.0, -0.6, -1.2], "LIKELIHOOD DISPLACEMENT"),
         ([0.0, -0.1, -0.2], [0.0, 0.1, 0.2], "FAILURE"),
     ],

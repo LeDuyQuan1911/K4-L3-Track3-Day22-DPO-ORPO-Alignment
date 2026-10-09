@@ -175,9 +175,12 @@ def diagnose(df, window: int = 3) -> tuple[str, str]:
             f"Margin {margin:+.3f} > 0 but chosen reward {chosen:+.3f} < 0: the gap grew "
             "because rejected fell faster. Compare with RPO in NB3b."
         )
-    if chosen > 0:
+    if chosen > 0 and rejected < 0:
         return "INTENDED", f"Chosen {chosen:+.3f} up, rejected {rejected:+.3f}, margin {margin:+.3f}."
-    return "AMBIGUOUS", f"Margin {margin:+.3f} with flat chosen reward; train longer or raise lr."
+    return "AMBIGUOUS", (
+        f"Margin {margin:+.3f} > 0, but chosen {chosen:+.3f} and rejected {rejected:+.3f} "
+        "do not match the intended chosen-up/rejected-down pattern. Inspect both curves and generations."
+    )
 
 
 def plot_rewards(train_df, eval_df, title: str, path: Path | None = None):
