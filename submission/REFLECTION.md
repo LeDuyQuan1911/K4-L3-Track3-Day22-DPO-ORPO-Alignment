@@ -6,7 +6,7 @@
 **Tier:** Google Colab T4
 **Ngày:** 2026-10-09
 
-Các số liệu dưới đây lấy từ `adapters/dpo/dpo_metrics.json`, `data/pref/stats.json`, `data/eval/judge_summary.json` và `data/eval/side_by_side.jsonl`. Notebook 48/48 cell chạy thành công: `colab/Lab22_DPO_Core_Run.ipynb`.
+Các số liệu phần bắt buộc lấy từ `adapters/dpo/dpo_metrics.json`, `data/pref/stats.json`, `data/eval/judge_summary.json` và `data/eval/side_by_side.jsonl`. Cả 48 ô mã phần NB0–NB4 đã chạy thành công trong `colab/Lab22_DPO_Core_Run.ipynb`. Sau đó tôi chạy thêm NB6; kết quả mới chỉ hoàn tất IFEval.
 
 ## 0. Câu hỏi NB0
 
@@ -72,7 +72,13 @@ Tôi quyết định chỉ dùng giám khảo đạt ngưỡng sanity ≥80% đ�
 
 ## 7. Bộ đo chuẩn (bonus NB6)
 
-Đang chạy sau NB0–NB4. Chỉ điền bảng khi `data/eval/benchmark_results.json` được tạo từ lm-eval thật.
+Tôi bắt đầu NB6 sau khi NB0–NB4 hoàn tất, dùng `lm-eval` với chat template, 0-shot và giới hạn 200 mẫu IFEval cho mỗi mô hình. Lượt SFT và lượt SFT+DPO đều hoàn tất; dòng kết quả được lưu nguyên trong output ô NB6 của `colab/Lab22_DPO_Core_Run.ipynb` và trích ra `data/eval/benchmark_partial_ifeval.json`.
+
+| Benchmark | SFT | SFT+DPO | Δ | Sai số chuẩn mỗi bên |
+|---|---:|---:|---:|---:|
+| IFEval, prompt-level strict accuracy, n=200 | 0,51 | 0,51 | 0,00 | 0,0354 |
+
+Chênh lệch bằng 0, nên IFEval không cho thấy DPO cải thiện khả năng tuân thủ chỉ dẫn trong lần chạy này. Colab ngắt phiên GPU sau IFEval và khi nối lại báo hết hạn mức GPU; runtime CPU mới không còn trọng số hay file `lm-eval` của phiên cũ. GSM8K đã bắt đầu nhưng **chưa tạo điểm**; Global-MMLU-vi chưa chạy. Tôi không điền số cho hai bộ đó và không coi NB6 là hoàn tất.
 
 ## 8. Biến thể loss (bonus NB3b)
 
@@ -86,7 +92,7 @@ Chưa chạy; không có số đo để báo cáo.
 
 - [ ] NB3b — biến thể loss
 - [ ] NB5 — GGUF SFT+DPO
-- [ ] NB6 — benchmark (đang chạy)
+- [ ] NB6 — IFEval đã đo; GSM8K và Global-MMLU-vi chưa hoàn tất do hết hạn mức GPU
 - [ ] NB7 — GRPO
 - [ ] β-sweep
 - [ ] Chấm chéo bằng giám khảo API khác họ

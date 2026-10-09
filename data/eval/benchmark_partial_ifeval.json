@@ -1,0 +1,17 @@
+{
+  "status": "partial",
+  "source": "colab/Lab22_DPO_Core_Run.ipynb, last code cell output",
+  "reason": "Colab GPU runtime ended after IFEval; no GSM8K or Global-MMLU-vi score was produced",
+  "results": [
+    {
+      "benchmark": "IFEval",
+      "task": "ifeval",
+      "limit_per_subtask": 200,
+      "sft": 0.51,
+      "sft_stderr": 0.035436970729343695,
+      "dpo": 0.51,
+      "dpo_stderr": 0.035436970729343695,
+      "delta": 0.0
+    }
+  ]
+}
