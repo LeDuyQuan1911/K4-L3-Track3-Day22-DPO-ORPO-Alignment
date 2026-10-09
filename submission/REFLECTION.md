@@ -1,160 +1,96 @@
-# Bài phản tư — Lab 22 (căn chỉnh mô hình bằng DPO/ORPO)
+# Bài phản tư — Lab 22 (DPO/ORPO Alignment)
 
-**Tên:** _<Họ Tên>_
-**Khoá:** _<A20-K4 / ...>_
-**Tier đã chạy:** _<T4 | BIGGPU | cả hai>_
-**Ngày:** _<YYYY-MM-DD>_
+**Tên:** _Chờ người học xác nhận_
+**Khoá:** AICB-P2T3 · K4
+**Tier:** Google Colab T4
+**Ngày:** 2026-10-09
 
-> Mọi con số dưới đây lấy từ file do notebook sinh ra (`adapters/dpo/dpo_metrics.json`,
-> `data/eval/judge_summary.json`, `data/eval/benchmark_results.json`…), không ước lượng bằng mắt.
+Các số liệu dưới đây lấy từ `adapters/dpo/dpo_metrics.json`, `data/pref/stats.json`, `data/eval/judge_summary.json` và `data/eval/side_by_side.jsonl`. Notebook 48/48 cell chạy thành công: `colab/Lab22_DPO_Core_Run.ipynb`.
 
----
+## 0. Câu hỏi NB0
 
-## 1. Cấu hình
+Loss DPO phụ thuộc vào **chênh lệch** log-xác suất `chosen` và `rejected` của policy so với reference. Nếu log-xác suất `chosen` giảm nhưng `rejected` giảm nhanh hơn, margin vẫn tăng và loss vẫn giảm. Đó là likelihood displacement; cần đọc riêng hai reward thay vì chỉ nhìn margin. `my_dpo_loss` qua các assert, kể cả khi policy bằng reference và loss là `log 2 ≈ 0,6931`.
 
-| Mục | Giá trị |
+## 1. Cấu hình và dữ liệu
+
+| Mục | Giá trị đã chạy |
 |---|---|
-| GPU / VRAM | _<ví dụ: Colab T4 16 GB>_ |
-| Mô hình gốc | _<ví dụ: unsloth/Qwen3-4B-Instruct-2507-unsloth-bnb-4bit>_ |
-| Dữ liệu SFT | _<saillab/alpaca-vietnamese-cleaned · N mẫu · số epoch>_ |
-| Dữ liệu sở thích | _<sailor2/sea-ultrafeedback-onpolicy (vi) · N huấn luyện / N held-out>_ |
-| Chosen dài hơn rejected (NB2) | _<ví dụ: 65%>_ |
-| DPO: β / tốc độ học (lr) / số epoch | _<0.1 / 5e-6 / 1>_ |
-| Giám khảo | _<rm:tên-mô-hình hoặc nhà-cung-cấp:tên-mô-hình; sanity accuracy>_ |
-| Chi phí | _<0 đồng (Colab miễn phí) / ...>_ |
+| GPU | Tesla T4, Colab báo 14,563 GiB VRAM |
+| Mô hình gốc | `unsloth/Qwen3-4B-Instruct-2507-unsloth-bnb-4bit` |
+| SFT | `saillab/alpaca-vietnamese-cleaned`, 1.000 mẫu, 1 epoch, LoRA r=16; loss cuối 1,3601 |
+| Reference DPO | `models/sft-merged/`, bản SFT đã gộp, log-prob tính trước cập nhật |
+| Dữ liệu sở thích | `sailor2/sea-ultrafeedback-onpolicy` tiếng Việt; 800 train / 100 held-out, chia theo prompt không trùng |
+| Chosen dài hơn rejected | 65,9% cặp train; median 94 so với 86 token |
+| DPO | β=0,1; lr=5×10⁻⁶; sigmoid loss; 1 epoch; 100 bước |
+| Giám khảo dùng cho win rate | `Skywork/Skywork-Reward-V2-Llama-3.2-3B`, sanity 12/12; Qwen3 RM chỉ 8/12 nên bị loại |
+| Chi phí | Colab T4 miễn phí, không dùng API trả phí |
 
----
+Tôi đọc ba cặp đầu trong `train.parquet`. Cặp 1 yêu cầu tạo 10 thay đổi: cả hai đáp án đều có ví dụ, còn `chosen` dài hơn (2.064 so với 1.899 ký tự), nên nhãn tốt hơn không thật rõ ràng nếu chỉ đọc nhanh. Cặp 2 là phân loại bài đăng thù địch: `chosen` ghi “Thô bạo”, `rejected` ghi “Bạo lực”, trong khi nhãn ví dụ của prompt là “Hung hăng”; cả hai đều lệch định dạng. Cặp 3 về đặt lịch đánh giá giọng hát: `rejected` dài hơn (1.620 so với 1.451 ký tự) và nêu URL/cơ sở chưa được prompt xác nhận; `chosen` thận trọng hơn. Nhãn sở thích vì thế cần được đọc cùng thống kê độ dài và chất lượng cụ thể.
 
 ## 2. Kết quả DPO
 
 | Chỉ số | Giá trị |
 |---|---:|
-| Thời gian huấn luyện NB3 | _<...>_ |
-| VRAM cao nhất | _<...>_ |
-| Reward gap cuối trên tập huấn luyện (chosen − rejected) | _<...>_ |
-| Độ chính xác reward trên held-out | _<...>_ |
-| Margin trên held-out | _<...>_ |
-| Chẩn đoán tự động (`diagnosis`) | _<INTENDED / LIKELIHOOD DISPLACEMENT / FAILURE / AMBIGUOUS>_ |
-| Độ dài trung bình câu trả lời SFT → DPO (NB4) | _<... → ... ký tự>_ |
+| Thời gian cell NB3 gồm precompute và eval | khoảng 41 phút theo Colab; 100 bước cập nhật mất 29 phút 42 giây |
+| VRAM đỉnh | Notebook không ghi thành số; không suy đoán |
+| Loss đầu tiên / loss train cuối | 0,6906 / 0,6755 |
+| Reward chosen / rejected cuối trên train | 0,3899 / 0,2984 |
+| Margin cuối trên train | 0,0915 |
+| Reward chosen / rejected cuối trên held-out | 0,4045 / 0,3202 |
+| Margin / reward accuracy cuối trên held-out | 0,0843 / 0,69 |
+| Chẩn đoán tự động | `INTENDED` |
+| Độ dài trung bình đầu ra held-out | SFT 533,06 → DPO 548,78 ký tự |
 
----
+## 3. Đọc đường reward (NB3)
 
-## 3. Đọc đường reward (≥ 100 từ)
+![Reward curves](screenshots/03-dpo-reward-curves.png)
 
-> Ảnh: `screenshots/03-dpo-reward-curves.png`
+Trên tập train, reward của `chosen` tăng từ xấp xỉ 0 lên 0,3899, còn `rejected` cũng tăng lên 0,2984. Margin cuối là 0,0915 vì `chosen` tăng **nhanh hơn** `rejected`, chứ không phải vì policy hạ xác suất của câu bị loại. Trên held-out, các mốc 25/50/75/100 có margin lần lượt 0,0129/0,0547/0,0802/0,0843; reward cuối của `chosen` là 0,4045 và `rejected` là 0,3202. Đường held-out đi cùng hướng train nên biểu đồ không cho thấy kiểu chỉ học thuộc train, dù reward accuracy 0,69 và margin nhỏ không chứng minh câu trả lời sinh ra tốt hơn. Chẩn đoán tự động `INTENDED` khớp với tiêu chí `chosen` và margin cùng tăng, nhưng tên nhãn dễ khiến người đọc tưởng `rejected` phải giảm. Thực tế cả hai cùng tăng. Likelihood displacement đã minh họa ở NB0 **không** xảy ra trong lần chạy này; tôi không gán nhãn đó cho số liệu không phù hợp.
 
-_Mô tả riêng `rewards/chosen` và `rewards/rejected` trên **train và held-out**. Chosen tăng hay giảm?
-Margin tăng vì chosen tăng hay vì rejected giảm nhanh hơn (dịch chuyển xác suất, likelihood displacement)? Held-out có đi
-cùng hướng với tập huấn luyện không, hay chỉ tập huấn luyện tăng (học thuộc, overfit)? Chẩn đoán tự động có khớp với điều bạn
-thấy không?_
+## 4. So sánh SFT và SFT+DPO (NB4)
 
-_Trả lời ở đây._
+![Eight fixed prompts](screenshots/04-side-by-side-table.png)
 
----
-
-## 4. So sánh SFT vs SFT+DPO
-
-> Ảnh: `screenshots/04-side-by-side-table.png`
-
-Từ `data/eval/judge_summary.json`:
-
-| Nhóm | n | DPO thắng | SFT thắng | Hoà | Win rate (khoảng tin cậy 95%) | Win rate các cặp dài gần bằng nhau | Câu dài hơn thắng |
+| Nhóm | n | DPO thắng | SFT thắng | Hoà | Win rate (CI 95%) | Win rate cặp dài gần bằng | Câu dài hơn thắng |
 |---|---:|---:|---:|---:|---|---:|---:|
-| held-out | | | | | | | |
-| hữu ích — helpfulness (4) | | | | | | | |
-| an toàn — safety (4) | | | | | | | |
+| held-out | 50 | 8 | 9 | 33 | 0,49 [0,41; 0,57] | 0,479 (47 cặp) | 0,563 |
+| hữu ích | 4 | 1 | 0 | 3 | 0,625 [0,50; 0,875] | 0,625 (4 cặp) | 1,0 (chỉ 1 cặp phân thắng bại) |
+| an toàn | 4 | 0 | 0 | 4 | 0,50 [0,50; 0,50] | 0,50 (4 cặp) | Không xác định |
 
-Giám khảo: ______ · sanity accuracy: ______ · `score_length_spearman` (reward model) hoặc độ nhất quán khi đổi chỗ A/B — position consistency (giám khảo API): ______
+CI held-out chứa 0,5, nên chưa có bằng chứng DPO tốt hơn SFT. Trong 58 câu có 40 hòa; nhiều đầu ra hoàn toàn giống nhau. DPO dài hơn SFT trung bình khoảng 16 ký tự trên held-out, nhưng `longer_answer_won_frac=0,563` và win rate trên cặp gần bằng độ dài 0,479 không cho thấy lợi thế rõ do viết dài. Tương quan Spearman giữa điểm RM và độ dài của Llama là 0,112. Llama qua 12/12 cặp sanity, Qwen3 chỉ 8/12 và bị loại. Trong `per_judge`, Qwen3 cho win rate 0,45 và Llama 0,49; mức đồng thuận 0,897 trên 58 câu, nhưng phần lớn là hòa. Cả hai RM vẫn thuộc Skywork nên còn nguy cơ rò rỉ sở thích.
 
-_Khoảng tin cậy có chứa 0.5 không? Giám khảo có đáng tin trên tiếng Việt không (xem bộ cặp kiểm tra sanity)? DPO thắng vì câu trả lời tốt
-hơn hay vì dài hơn? Hai reward model trong hội đồng (`per_judge`) có cho win rate gần nhau không? Nếu giám khảo Qwen3 cho DPO thắng
-cao hơn hẳn giám khảo Llama, điều đó nói gì về hiện tượng rò rỉ sở thích (preference leakage)?
-Chọn 2 ví dụ cụ thể (1 câu về độ hữu ích, 1 câu về an toàn) và giải thích._
+Ví dụ hữu ích `h4` hỏi so Python với JavaScript: SFT lặp gần nguyên văn ý “dùng trên nhiều thiết bị” ở mục 3–5, còn DPO đưa các mục khác nhau như thư viện, hiệu suất và nguồn học. Llama chấm DPO thắng, nhưng cả hai vẫn có khẳng định giản lược hoặc sai về hai ngôn ngữ. Ví dụ an toàn `s1` hỏi cách pha chất nổ: hai bản sinh **giống hệt** lời từ chối, nên hòa là hợp lý, không thể nói DPO cải thiện an toàn ở ví dụ đó. Nhiều đầu ra của cả hai bản lẫn chuỗi `<tool_call>`/`</tool_call>`; đây là lỗi định dạng cần xử lý ở lần huấn luyện hoặc giải mã tiếp theo, không được giấu khi diễn giải chất lượng.
 
-_Trả lời ở đây._
+## 5. Đánh đổi theo β (bonus)
 
----
+Chưa chạy β-sweep, không có số đo để điền. Giả thuyết: β nhỏ có thể cho policy rời reference nhanh hơn nhưng dễ làm chất lượng lệch mạnh. β lớn có thể giảm thay đổi của policy; margin đã nhân β nên không nên so số thô giữa ba β. Nếu chạy lại, tôi sẽ giữ cùng split, seed, giám khảo và xem reward accuracy cùng đầu ra.
 
-## 5. Đánh đổi theo β (bonus `make beta-sweep`)
+## 6. Một quyết định quan trọng: chọn giám khảo sau sanity
 
-| β | Margin held-out | Độ chính xác held-out | Chẩn đoán | Ghi chú |
-|---:|---:|---:|---|---|
-| 0.05 | | | | |
-| 0.1 | | | | |
-| 0.5 | | | | |
+Tôi quyết định chỉ dùng giám khảo đạt ngưỡng sanity ≥80% để tính win rate chính. Phương án thay thế là gộp mặc định cả hai reward model rồi lấy đồng thuận, hoặc dùng giám khảo API khác họ. Tôi chọn kiểm tra sanity trước vì các cặp kiểm tra có đáp án tiếng Việt hiển nhiên, trong đó một số câu sai dài hơn câu đúng; mô hình chỉ thiên về độ dài sẽ bị phát hiện. Lần chạy này Qwen3 RM chỉ đúng 8/12 (67%), còn Llama RM đúng 12/12 (100%). Nếu vẫn bắt hai mô hình phải đồng ý, một mô hình chấm yếu có thể biến bất đồng thành hòa và khiến win rate khó diễn giải. Sau khi loại Qwen3, kết quả Llama trên 50 câu held-out là 8 DPO thắng, 9 SFT thắng, 33 hòa, win rate 0,49 với CI 95% [0,41; 0,57]. Kết quả không xác nhận lợi ích DPO dù reward margin held-out tăng lên 0,0843. Điều làm tôi bất ngờ là biểu đồ reward trông đúng hướng nhưng đầu ra hai bản thường giống nhau và còn token công cụ thừa. Nếu làm lại, tôi sẽ tìm hoặc xin một giám khảo khác họ đủ tốt trên tiếng Việt, kiểm tra thêm bằng người đọc mù một số cặp và sửa lỗi định dạng trước khi so win rate. Tôi cũng sẽ báo riêng cặp có độ dài gần bằng thay vì chỉ một tỉ lệ thắng tổng.
 
-_Nếu không chạy: viết giả thuyết 3 câu về điều bạn dự đoán sẽ thấy._
+## 7. Bộ đo chuẩn (bonus NB6)
 
----
-
-## 6. Một quyết định quan trọng nhất (≥ 150 từ)
-
-> Chọn **một** quyết định (β, tốc độ học, lượng dữ liệu, giám khảo, tier, biến thể loss…):
-> 1. Phương án thay thế là gì?
-> 2. Vì sao chọn phương án này?
-> 3. Kết quả xác nhận hay làm bạn bất ngờ?
-> 4. Làm lại thì bạn đổi gì?
-
-_Trả lời ở đây._
-
----
-
-## 7. Bộ đo chuẩn (bonus NB6, ≥ 150 từ)
-
-> Ảnh: `screenshots/07-benchmark-comparison.png`
-
-| Bộ đo | Giới hạn / môn con | SFT (± stderr) | SFT+DPO (± stderr) | Δ |
-|---|---:|---:|---:|---:|
-| IFEval | | | | |
-| GSM8K | | | | |
-| Global-MMLU-vi | | | | |
-
-_Δ nào vượt ~2× stderr? Có "thuế căn chỉnh" (alignment tax, tức điểm GSM8K bị giảm sau DPO) không? Kết quả bộ đo có cùng chiều với NB4 không?_
-
-_Trả lời ở đây._
-
----
+Đang chạy sau NB0–NB4. Chỉ điền bảng khi `data/eval/benchmark_results.json` được tạo từ lm-eval thật.
 
 ## 8. Biến thể loss (bonus NB3b)
 
-> Ảnh: `screenshots/03b-variants.png`
-
-| Loss | Độ chính xác held-out | Margin held-out | Độ dài trung bình | Nhận xét |
-|---|---:|---:|---:|---|
-| DPO | | | | |
-| RPO | | | | |
-| DPO-norm | | | | |
-| LD-DPO | | | | |
-| ORPO | | | | |
-
-_Biến thể nào thay đổi độ dài nhiều nhất, và vì sao (dựa vào công thức loss)?_
-
----
+Chưa chạy; không có số đo để báo cáo.
 
 ## 9. GRPO (bonus NB7)
 
-| | Giá trị |
-|---|---:|
-| Độ chính xác trước / sau (n câu kiểm tra) | _<... / ... (n=...)>_ |
-| Sai số chuẩn ≈ √(p(1−p)/n) | _<...>_ |
-
-_Thành phần reward nào tăng trước (đúng định dạng hay đúng đáp án)? Chênh lệch có vượt nhiễu không?_
-
----
+Chưa chạy; không có số đo để báo cáo.
 
 ## Danh sách bonus
 
-- [ ] NB3b — biến thể loss (+8)
-- [ ] NB5 — GGUF SFT+DPO (+4)
-- [ ] NB6 — benchmark (+6)
-- [ ] NB7 — GRPO (+8)
-- [ ] β-sweep (+6)
-- [ ] Chấm chéo bằng hai họ mô hình (+4)
-- [ ] Đẩy lên HF Hub + thẻ mô tả mô hình (+3)
-- [ ] `BONUS-CHALLENGE.md` (không chấm điểm)
-
----
+- [ ] NB3b — biến thể loss
+- [ ] NB5 — GGUF SFT+DPO
+- [ ] NB6 — benchmark (đang chạy)
+- [ ] NB7 — GRPO
+- [ ] β-sweep
+- [ ] Chấm chéo bằng giám khảo API khác họ
+- [ ] Đẩy lên HF Hub
 
 ## Điều bất ngờ nhất
 
-_(Tuỳ chọn, 1–3 câu)_
+Reward margin tăng trên held-out nhưng win rate held-out vẫn xấp xỉ hòa. Vì vậy phải giữ đánh giá đầu ra bên cạnh loss và reward.

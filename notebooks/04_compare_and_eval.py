@@ -114,19 +114,36 @@ fixed = records[: len(FIXED_PROMPTS)]
 for r in fixed:
     print(f"\n[{r['id']} · {r['category']}] {r['prompt']}\n  SFT: {textwrap.shorten(r['sft'], 300)}\n  DPO: {textwrap.shorten(r['dpo'], 300)}")
 
-fig, ax = plt.subplots(figsize=(14, 0.7 * len(fixed) + 1.5))
+def table_excerpt(text: str, other: str, width: int = 38) -> str:
+    """Show the first difference, or the opening text when outputs are equal."""
+    flat = " ".join(text.split())
+    peer = " ".join(other.split())
+    first_diff = next((i for i, (a, b) in enumerate(zip(flat, peer)) if a != b), min(len(flat), len(peer)))
+    start = max(0, first_diff - 35) if flat != peer else 0
+    excerpt = ("…" if start else "") + flat[start : start + 135]
+    if start + 135 < len(flat):
+        excerpt += "…"
+    return textwrap.fill(excerpt, width=width, break_long_words=False)
+
+
+fig, ax = plt.subplots(figsize=(16, 9))
 ax.axis("off")
-cells = [["id", "prompt", "SFT", "SFT+DPO"]] + [
-    [r["id"], textwrap.shorten(r["prompt"], 40), textwrap.shorten(r["sft"], 70), textwrap.shorten(r["dpo"], 70)]
+cells = [["id", "prompt", "SFT (trích đoạn)", "SFT+DPO (trích đoạn)"]] + [
+    [r["id"], textwrap.fill(textwrap.shorten(r["prompt"], 85), width=27),
+     table_excerpt(r["sft"], r["dpo"]),
+     "Giống hệt SFT" if r["sft"] == r["dpo"] else table_excerpt(r["dpo"], r["sft"])]
     for r in fixed
 ]
-table = ax.table(cellText=cells, loc="center", cellLoc="left", colWidths=[0.05, 0.25, 0.35, 0.35])
+table = ax.table(cellText=cells, bbox=[0, 0.06, 1, 0.94], cellLoc="left", colWidths=[0.05, 0.23, 0.36, 0.36])
 table.auto_set_font_size(False)
-table.set_fontsize(8)
-table.scale(1.0, 1.6)
+table.set_fontsize(9)
+for cell in table.get_celld().values():
+    cell.set_text_props(va="center")
+    cell.PAD = 0.03
 for j in range(4):
     table[(0, j)].set_facecolor("#2e548a")
     table[(0, j)].set_text_props(color="white", weight="bold")
+fig.text(0.01, 0.015, "Trích đoạn quanh điểm khác nhau; đầu ra đầy đủ và token công cụ thừa ở data/eval/side_by_side.jsonl.", fontsize=9)
 fig.savefig(C.SCREENSHOTS / "04-side-by-side-table.png", dpi=120, bbox_inches="tight")
 plt.show()
 

@@ -58,10 +58,13 @@ def check_dpo(problems: list[str], warnings: list[str]) -> None:
         return
     base = str((read_json(adapter / "adapter_config.json", problems) or {}).get("base_model_name_or_path", ""))
     expected = (REPO / "models" / "sft-merged").resolve()
-    if not base or Path(base).resolve() != expected:
+    # The submitted adapter may have been trained in the generated Colab bundle
+    # and downloaded into this repository after the ephemeral runtime ended.
+    colab_base = Path("/content/lab22/models/sft-merged")
+    if not base or (Path(base).resolve() != expected and Path(base) != colab_base):
         problems.append(
             f"WRONG REF  adapters/dpo was trained on {base!r}, not {rel(expected)}: the DPO reference "
-            "must be this repo's SFT model (if the repo moved, rerun NB3 here)."
+            "must be this repo's SFT model or the generated Colab bundle's SFT model."
         )
     sys.path.insert(0, str(REPO))
     from lab22.data import split_mismatch
@@ -185,6 +188,8 @@ def smoke() -> int:
 
 
 def main() -> int:
+    if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true", help="pre-training import/GPU check")
     if parser.parse_args().smoke:
